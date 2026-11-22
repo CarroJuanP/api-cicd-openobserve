@@ -350,12 +350,14 @@ test.describe('Interacción 5. Hover', () => {
 test.describe('Interacción 6. Alertas, modal, iframe y pestañas', () => {
   test('el botón de ayuda lanza una alerta JavaScript', async ({ page }) => {
     await openPanel(page);
-    const dialogo = page.waitForEvent('dialog');
+    let mensaje = '';
+    page.once('dialog', async (d) => {
+      mensaje = d.message();
+      expect(d.type()).toBe('alert');
+      await d.accept();
+    });
     await page.getByTestId('help-btn').click();
-    const d = await dialogo;
-    expect(d.type()).toBe('alert');
-    expect(d.message()).toContain('Panel de gestión');
-    await d.accept();
+    expect(mensaje).toContain('Panel de gestión');
   });
   test('descartar la alerta no rompe la página', async ({ page }) => {
     await openPanel(page);

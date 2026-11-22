@@ -87,8 +87,22 @@
 
   // ---- ayuda (alert), modal con iframe, enlace a nueva pestaña ----
   $('help-btn').addEventListener('click', () => alert('Panel de gestión: administra usuarios y productos. Usa la búsqueda y haz clic en los encabezados para ordenar.'));
-  $('about-btn').addEventListener('click', () => { $('about-frame').src = '/api/status'; $('about-modal').showModal(); });
+  $('about-btn').addEventListener('click', () => {
+    $('about-frame').src = '/api/status';
+    $('about-modal').showModal();
+    $('about-close').focus();
+  });
   $('about-close').addEventListener('click', () => $('about-modal').close());
+  $('about-modal').addEventListener('cancel', (event) => {
+    event.preventDefault();
+    $('about-modal').close();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && $('about-modal').open) {
+      event.preventDefault();
+      $('about-modal').close();
+    }
+  });
 
   // ---- botón volver arriba (scroll) ----
   function updateBackToTop() { $('back-to-top').hidden = window.scrollY <= 200; }
