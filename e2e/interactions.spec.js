@@ -567,8 +567,8 @@ test.describe('Interacción 9. Almacenamiento y accesibilidad', () => {
   });
   test('los campos del login tienen etiqueta accesible', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByLabel('Usuario')).toBeVisible();
-    await expect(page.getByLabel('Contraseña')).toBeVisible();
+    await expect(page.getByLabel('Usuario', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('Contraseña', { exact: true })).toBeVisible();
   });
   test('el botón de entrar tiene rol y nombre accesibles', async ({ page }) => {
     await page.goto('/');
