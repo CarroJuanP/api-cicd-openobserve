@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Panel de Gestión | API DevOps</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- ===== LOGIN ===== -->
+  <main id="login-view" class="card login">
+    <h1>Iniciar sesión</h1>
+    <form id="login-form" autocomplete="off">
+      <label>Usuario <input id="login-username" name="username" data-testid="login-username" /></label>
+      <label>Contraseña <input id="login-password" name="password" type="password" data-testid="login-password" /></label>
+      <button type="submit" data-testid="login-submit">Entrar</button>
+      <p id="login-error" class="error" data-testid="login-error" role="alert"></p>
+    </form>
+  </main>
+
+  <!-- ===== PANEL ===== -->
+  <div id="app-view" hidden>
+    <header>
+      <h1>Panel de Gestión</h1>
+      <div class="header-actions">
+        <span id="whoami" data-testid="whoami"></span>
+        <button id="help-btn" data-testid="help-btn" title="Ayuda" aria-label="Ayuda">?</button>
+        <button id="about-btn" data-testid="about-btn" title="Acerca de">Acerca de</button>
+        <a id="status-link" data-testid="status-link" href="/api/status" target="_blank" rel="noopener" title="Abrir estado de la API en otra pestaña">Estado API</a>
+        <button id="logout" data-testid="logout">Salir</button>
+      </div>
+    </header>
+
+    <nav>
+      <button class="tab active" data-tab="users" data-testid="tab-users">Usuarios</button>
+      <button class="tab" data-tab="products" data-testid="tab-products">Productos</button>
+    </nav>
+
+    <p id="msg" class="msg" data-testid="msg" role="status"></p>
+
+    <!-- CRUD Usuarios -->
+    <section id="tab-users" class="card">
+      <h2>Usuarios</h2>
+      <form id="user-form">
+        <input type="hidden" id="user-id" />
+        <input id="user-username" placeholder="Username" data-testid="user-username" />
+        <input id="user-nombre" placeholder="Nombre" data-testid="user-nombre" />
+        <input id="user-email" placeholder="Email" data-testid="user-email" />
+        <input id="user-password" type="password" placeholder="Contraseña" data-testid="user-password" />
+        <select id="user-rol" data-testid="user-rol"><option value="usuario">usuario</option><option value="admin">admin</option></select>
+        <button type="submit" data-testid="user-save">Guardar</button>
+        <button type="button" id="user-cancel">Cancelar</button>
+      </form>
+      <div class="toolbar">
+        <input id="user-search" type="search" placeholder="Buscar usuarios…" aria-label="Buscar usuarios" data-testid="user-search" />
+        <span id="users-count" class="count" data-testid="users-count"></span>
+      </div>
+      <div class="table-wrap">
+        <table data-testid="users-table">
+          <thead><tr>
+            <th class="sortable" data-sort="id" aria-sort="none">ID</th>
+            <th class="sortable" data-sort="username" aria-sort="none">Username</th>
+            <th class="sortable" data-sort="nombre" aria-sort="none">Nombre</th>
+            <th>Email</th>
+            <th class="sortable" data-sort="rol" aria-sort="none">Rol</th>
+            <th>Acciones</th>
+          </tr></thead>
+          <tbody id="users-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- CRUD Productos -->
+    <section id="tab-products" class="card" hidden>
+      <h2>Productos</h2>
+      <form id="product-form">
+        <input type="hidden" id="product-id" />
+        <input id="product-nombre" placeholder="Nombre" data-testid="product-nombre" />
+        <input id="product-precio" type="number" step="0.01" placeholder="Precio" data-testid="product-precio" />
+        <select id="product-categoria" data-testid="product-categoria"></select>
+        <button type="submit" data-testid="product-save">Guardar</button>
+        <button type="button" id="product-cancel">Cancelar</button>
+      </form>
+      <div class="toolbar">
+        <input id="product-search" type="search" placeholder="Buscar productos…" aria-label="Buscar productos" data-testid="product-search" />
+        <span id="products-count" class="count" data-testid="products-count"></span>
+      </div>
+      <p class="hint">Arrastra las filas para reordenarlas (solo en pantalla).</p>
+      <div class="table-wrap">
+        <table data-testid="products-table">
+          <thead><tr>
+            <th class="sortable" data-sort="id" aria-sort="none">ID</th>
+            <th class="sortable" data-sort="nombre" aria-sort="none">Nombre</th>
+            <th class="sortable" data-sort="precio" aria-sort="none">Precio</th>
+            <th class="sortable" data-sort="categoria" aria-sort="none">Categoría</th>
+            <th>Acciones</th>
+          </tr></thead>
+          <tbody id="products-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <button id="back-to-top" data-testid="back-to-top" title="Volver arriba" aria-label="Volver arriba" hidden>↑</button>
+  </div>
+
+  <!-- Ventana modal con iframe -->
+  <dialog id="about-modal" data-testid="about-modal" aria-labelledby="about-title">
+    <h2 id="about-title">Acerca de</h2>
+    <p>Panel de gestión de usuarios y productos. Estado actual de la API:</p>
+    <iframe id="about-frame" data-testid="about-frame" title="Estado de la API" src="about:blank"></iframe>
+    <button id="about-close" data-testid="about-close">Cerrar</button>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>

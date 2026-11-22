@@ -1,0 +1,36 @@
+# OpenTelemetry Collector: recolecta recursos del servidor y los envía a OpenObserve (OTLP/HTTP)
+receivers:
+  hostmetrics:
+    root_path: /hostfs
+    collection_interval: 15s
+    scrapers:
+      cpu:
+        metrics:
+          system.cpu.utilization: { enabled: true }
+      memory:
+        metrics:
+          system.memory.utilization: { enabled: true }
+      load: {}
+      network: {}      # ancho de banda: system.network.io (bytes tx/rx)
+      filesystem: {}
+      disk: {}
+
+processors:
+  batch: {}
+  resourcedetection:
+    detectors: [env, system, ec2]
+    timeout: 5s
+    override: false
+
+exporters:
+  otlphttp/openobserve:
+    endpoint: http://openobserve:5080/api/default
+    headers:
+      Authorization: "Basic ${env:OO_BASIC_AUTH}"
+
+service:
+  pipelines:
+    metrics:
+      receivers: [hostmetrics]
+      processors: [resourcedetection, batch]
+      exporters: [otlphttp/openobserve]

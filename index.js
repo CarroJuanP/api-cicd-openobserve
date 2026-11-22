@@ -1,10 +1,16 @@
+require('./telemetry'); // OpenTelemetry debe cargarse primero
 const express = require('express');
 const net = require('net');
 const path = require('path');
 const db = require('./database');
+const authRouter = require('./auth');
+const { metricsMiddleware, errorMiddleware, log } = require('./observability');
 
 const app = express();
 app.use(express.json());
+app.use(metricsMiddleware);
+app.use(express.static(path.join(__dirname, 'public'))); // Frontend
+app.use('/api', authRouter);              // Login + CRUD usuarios
 
 const HTTP_PORT = process.env.PORT || 8080;
 const TCP_PORT = process.env.TCP_PORT || 6061;
@@ -220,7 +226,7 @@ resources.forEach((resName) => {
 
 // --- Backup & Vaciar ---
 /* istanbul ignore next */
-app.get('/api/db/backup', (req, res) => res.download(path.join(__dirname, 'midatabase.db')));
+app.get('/api/db/backup', (req, res) => res.download(path.resolve(process.env.DB_PATH || path.join(__dirname, 'midatabase.db'))));
 /* istanbul ignore next */
 app.post('/api/db/vaciar', (req, res) => res.json({ message: 'OK' }));
 
@@ -235,5 +241,14 @@ if (process.env.NODE_ENV !== 'test' && require.main === module) {
   app.listen(HTTP_PORT, () => console.log(`HTTP listening on ${HTTP_PORT}`));
   tcpServer.listen(TCP_PORT, () => console.log(`TCP listening on ${TCP_PORT}`));
 }
+
+// Manejo de errores (JSON malformado, excepciones) -> status 4xx/5xx + log
+app.use((err, req, res, next) => {
+  if (err.type === 'entity.parse.failed') {
+    log('warn', 'json_malformado', { route: req.path });
+    return res.status(400).json({ error: 'JSON inválido' });
+  }
+  return errorMiddleware(err, req, res, next);
+});
 
 module.exports = app;

@@ -1,9 +1,14 @@
 node_modules
 npm-debug.log
 coverage
+playwright-report
+test-results
+e2e
+tests
 .git
+.github
 .gitignore
 .env
-Dockerfile
-.dockerignore
 *.db
+infra
+docker-compose*.yml

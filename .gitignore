@@ -1,3 +1,7 @@
 node_modules/
 coverage/
+playwright-report/
+test-results/
 *.db
+.e2e-test.db
+.env

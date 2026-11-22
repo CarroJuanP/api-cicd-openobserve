@@ -1,45 +1,87 @@
-name: Deploy to Docker Hub + EC2
+name: CI/CD - Tests + Deploy a EC2 + Observabilidad
 
 on:
   push:
     branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+env:
+  OO_STREAM_CICD: cicd_pipeline   # stream de OpenObserve donde se registran los eventos
 
 jobs:
-  test:
+  # ---------------------------------------------------------------
+  # 1) Pruebas unitarias del backend (Jest + Supertest)
+  # ---------------------------------------------------------------
+  backend-tests:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '18'
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Run unit tests with coverage
+          node-version: '20'
+      - run: npm install
+      - name: Jest (unitarias backend)
         run: npm test
 
-  build-and-push:
-    needs: test
+  # ---------------------------------------------------------------
+  # 2) Pruebas E2E Frontend + Backend (Playwright)
+  # ---------------------------------------------------------------
+  e2e-tests:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install
+      - name: Instalar navegador Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Playwright (E2E)
+        run: npx playwright test
+      - name: Subir reporte de Playwright
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
 
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+  # ---------------------------------------------------------------
+  # 3) RF-03: registrar resultado de las pruebas en OpenObserve (siempre)
+  # ---------------------------------------------------------------
+  log-tests:
+    needs: [backend-tests, e2e-tests]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enviar resultado de pruebas a OpenObserve
+        env:
+          BACKEND: ${{ needs.backend-tests.result }}
+          E2E: ${{ needs.e2e-tests.result }}
+        run: |
+          if [ "$BACKEND" = "success" ] && [ "$E2E" = "success" ]; then STATUS=success; else STATUS=failure; fi
+          curl -sS --max-time 20 -X POST "${{ secrets.OO_URL }}/api/default/${OO_STREAM_CICD}/_json" \
+            -H "Authorization: Basic ${{ secrets.OO_BASIC_AUTH }}" \
+            -H "Content-Type: application/json" \
+            -d "[{\"event\":\"tests\",\"status\":\"$STATUS\",\"backend_tests\":\"$BACKEND\",\"e2e_tests\":\"$E2E\",\"commit\":\"${{ github.sha }}\",\"branch\":\"${{ github.ref_name }}\",\"actor\":\"${{ github.actor }}\",\"run_id\":\"${{ github.run_id }}\",\"run_url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"repository\":\"${{ github.repository }}\"}]" \
+            || echo "No se pudo contactar OpenObserve"
+
+  # ---------------------------------------------------------------
+  # 4) Build + push de la imagen (solo si TODAS las pruebas pasaron)
+  # ---------------------------------------------------------------
+  build-and-push:
+    needs: [backend-tests, e2e-tests]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v6
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
         with:
           context: .
           push: true
@@ -49,21 +91,60 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  # ---------------------------------------------------------------
+  # 5) Despliegue en EC2 por SSH (NUNCA corre si fallan las pruebas)
+  # ---------------------------------------------------------------
   deploy-ec2:
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
-      - name: Desplegar en EC2 vía SSH
+      - uses: actions/checkout@v4
+      - name: Copiar compose y configuración a EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "docker-compose.yml,infra"
+          target: "/home/${{ secrets.EC2_USERNAME }}/app"
+      - name: Actualizar contenedores en EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/mi-api:latest
+            cd ~/app
+            cat > .env <<ENVEOF
+            DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
+            ZO_ROOT_USER_EMAIL=${{ secrets.ZO_ROOT_USER_EMAIL }}
+            ZO_ROOT_USER_PASSWORD=${{ secrets.ZO_ROOT_USER_PASSWORD }}
+            OO_BASIC_AUTH=${{ secrets.OO_BASIC_AUTH }}
+            TEMP_SOURCE=${{ secrets.TEMP_SOURCE || 'real' }}
+            ENVEOF
             sudo docker stop mi-api-container || true
             sudo docker rm mi-api-container || true
-            sudo docker run -d --name mi-api-container -p 80:8080 ${{ secrets.DOCKERHUB_USERNAME }}/mi-api:latest
-            sleep 3
-            sudo docker ps -a
-            sudo docker logs mi-api-container
+            sudo docker compose pull
+            sudo docker compose up -d
+            sleep 5
+            sudo docker compose ps
+
+  # ---------------------------------------------------------------
+  # 6) RF-03: registrar evento de despliegue en OpenObserve
+  # ---------------------------------------------------------------
+  log-deploy:
+    needs: deploy-ec2
+    if: always() && needs.deploy-ec2.result != 'skipped'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enviar evento de despliegue a OpenObserve
+        env:
+          RESULT: ${{ needs.deploy-ec2.result }}
+        run: |
+          curl -sS --max-time 20 -X POST "${{ secrets.OO_URL }}/api/default/${OO_STREAM_CICD}/_json" \
+            -H "Authorization: Basic ${{ secrets.OO_BASIC_AUTH }}" \
+            -H "Content-Type: application/json" \
+            -d "[{\"event\":\"deploy\",\"status\":\"$RESULT\",\"target\":\"aws-ec2\",\"commit\":\"${{ github.sha }}\",\"branch\":\"${{ github.ref_name }}\",\"actor\":\"${{ github.actor }}\",\"run_id\":\"${{ github.run_id }}\",\"run_url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}]" \
+            || echo "No se pudo contactar OpenObserve"

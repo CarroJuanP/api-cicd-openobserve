@@ -1,0 +1,69 @@
+# Stack de producción en EC2: API + OpenObserve + Collector de infraestructura + agente de temperatura
+services:
+  api:
+    image: ${DOCKERHUB_USERNAME}/mi-api:latest
+    container_name: mi-api-container
+    restart: unless-stopped
+    ports:
+      - "80:8080"
+    environment:
+      PORT: 8080
+      JWT_SECRET: ${JWT_SECRET}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      OTEL_SERVICE_NAME: api-devops-sqlite
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://openobserve:5080/api/default
+      OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Basic ${OO_BASIC_AUTH}"
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment=production
+    volumes:
+      - api-data:/data
+    depends_on:
+      - openobserve
+
+  openobserve:
+    image: public.ecr.aws/zinclabs/openobserve:latest
+    container_name: openobserve
+    restart: unless-stopped
+    ports:
+      - "5080:5080"
+    environment:
+      ZO_ROOT_USER_EMAIL: ${ZO_ROOT_USER_EMAIL}
+      ZO_ROOT_USER_PASSWORD: ${ZO_ROOT_USER_PASSWORD}
+      ZO_DATA_DIR: /data
+    volumes:
+      - oo-data:/data
+
+  # RF-05: métricas del host (CPU, RAM, red) -> OpenObserve
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel-collector
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol/config.yaml"]
+    environment:
+      OO_BASIC_AUTH: ${OO_BASIC_AUTH}
+    volumes:
+      - ./infra/otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
+      - /:/hostfs:ro
+    pid: host
+    depends_on:
+      - openobserve
+
+  # RF-05: temperatura del servidor -> OpenObserve (API HTTP/JSON)
+  temp-agent:
+    image: node:20-alpine
+    container_name: temp-agent
+    restart: unless-stopped
+    working_dir: /agent
+    command: ["node", "temp-agent.js"]
+    environment:
+      OO_URL: http://openobserve:5080
+      OO_BASIC_AUTH: ${OO_BASIC_AUTH}
+      TEMP_SOURCE: ${TEMP_SOURCE:-real}
+    volumes:
+      - ./infra/temp-agent.js:/agent/temp-agent.js:ro
+      - /sys:/host/sys:ro
+    depends_on:
+      - openobserve
+
+volumes:
+  api-data:
+  oo-data:
