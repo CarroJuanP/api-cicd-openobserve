@@ -39,6 +39,27 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Playwright (E2E)
         run: npx playwright test --workers=1
+      - name: Resumen de pruebas Playwright
+        if: always()
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const report = 'playwright-report/results.json';
+          if (!fs.existsSync(report)) {
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '## Playwright\nNo se generó `results.json`.\n');
+            process.exit(0);
+          }
+          const r = JSON.parse(fs.readFileSync(report, 'utf8'));
+          const failed = [];
+          const walk = suite => {
+            for (const spec of suite.specs || []) if (!spec.ok) failed.push(spec.title);
+            for (const child of suite.suites || []) walk(child);
+          };
+          r.suites.forEach(walk);
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,
+            `## Playwright\nAprobadas: ${r.stats.expected}\nFallidas: ${r.stats.unexpected}\n` +
+            (failed.length ? `\n### Pruebas fallidas\n${failed.map(t => `- ${t}`).join('\n')}\n` : '\nTodas las pruebas aprobaron.\n'));
+          NODE
       - name: Subir reporte de Playwright
         if: always()
         uses: actions/upload-artifact@v4
