@@ -1,9 +1,10 @@
 const { defineConfig, devices } = require('@playwright/test');
 const path = require('node:path');
 const fs = require('node:fs');
+const os = require('node:os');
 
 const PORT = process.env.E2E_PORT || 3100;
-const E2E_DB_PATH = path.join(__dirname, '.e2e-test.db');
+const E2E_DB_PATH = path.join(os.tmpdir(), `api-e2e-${process.pid}.db`);
 
 // Empieza cada ejecución de Playwright con una base temporal limpia.
 try { fs.rmSync(E2E_DB_PATH, { force: true }); } catch (_) {}
@@ -20,7 +21,7 @@ module.exports = defineConfig({
   webServer: {
     command: 'node index.js',
     url: `http://localhost:${PORT}/api/status`,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     env: { PORT: String(PORT), TCP_PORT: String(Number(PORT) + 1), DB_PATH: E2E_DB_PATH, ADMIN_PASSWORD: 'Admin123!', NODE_ENV: 'e2e' },
   },
 });
