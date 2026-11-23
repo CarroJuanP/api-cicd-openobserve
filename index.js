@@ -16,8 +16,13 @@ const HTTP_PORT = process.env.PORT || 8080;
 const TCP_PORT = process.env.TCP_PORT || 6061;
 
 // --- 1. ENDPOINTS HTTP ---
-app.get('/api/status', (req, res) => {
-  res.json({ status: 'online revisando', timestamp: new Date() });
+app.get('/api/status', async (req, res) => {
+  try {
+    await db.ready;
+    res.json({ status: 'online revisando', timestamp: new Date() });
+  } catch (err) {
+    res.status(503).json({ error: 'Base de datos no disponible', detail: err.message });
+  }
 });
 
 app.get('/api/categorias', (req, res) => {
@@ -238,8 +243,15 @@ const tcpServer = net.createServer((socket) => {
 
 /* istanbul ignore next */
 if (process.env.NODE_ENV !== 'test' && require.main === module) {
-  app.listen(HTTP_PORT, () => console.log(`HTTP listening on ${HTTP_PORT}`));
-  tcpServer.listen(TCP_PORT, () => console.log(`TCP listening on ${TCP_PORT}`));
+  db.ready
+    .then(() => {
+      app.listen(HTTP_PORT, () => console.log(`HTTP listening on ${HTTP_PORT}`));
+      tcpServer.listen(TCP_PORT, () => console.log(`TCP listening on ${TCP_PORT}`));
+    })
+    .catch((err) => {
+      console.error('No se pudo inicializar la base de datos:', err.message);
+      process.exit(1);
+    });
 }
 
 // Manejo de errores (JSON malformado, excepciones) -> status 4xx/5xx + log
