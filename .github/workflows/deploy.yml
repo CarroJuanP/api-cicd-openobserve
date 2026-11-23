@@ -19,7 +19,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
       - run: npm ci
       - name: Jest (unitarias backend)
         run: npm test
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
       - run: npm ci
       - name: Instalar navegador Chromium
         run: npx playwright install --with-deps chromium
@@ -52,13 +52,27 @@ jobs:
           const r = JSON.parse(fs.readFileSync(report, 'utf8'));
           const failed = [];
           const walk = suite => {
-            for (const spec of suite.specs || []) if (!spec.ok) failed.push(spec.title);
+            for (const spec of suite.specs || []) {
+              if (!spec.ok) {
+                let message = 'Sin detalle disponible';
+                for (const test of spec.tests || []) {
+                  for (const result of test.results || []) {
+                    if (result.errors && result.errors.length) {
+                      message = result.errors[0].message.split('\n').slice(0, 8).join('\n');
+                      break;
+                    }
+                  }
+                  if (message !== 'Sin detalle disponible') break;
+                }
+                failed.push({ title: spec.title, message });
+              }
+            }
             for (const child of suite.suites || []) walk(child);
           };
           r.suites.forEach(walk);
           fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,
             `## Playwright\nAprobadas: ${r.stats.expected}\nFallidas: ${r.stats.unexpected}\n` +
-            (failed.length ? `\n### Pruebas fallidas\n${failed.map(t => `- ${t}`).join('\n')}\n` : '\nTodas las pruebas aprobaron.\n'));
+            (failed.length ? `\n### Pruebas fallidas\n${failed.map(f => `- **${f.title}**\n  \`\`\`\n${f.message}\n  \`\`\``).join('\n')}\n` : '\nTodas las pruebas aprobaron.\n'));
           NODE
       - name: Subir reporte de Playwright
         if: always()
