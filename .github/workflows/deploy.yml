@@ -20,7 +20,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - run: npm install
+      - run: npm ci
       - name: Jest (unitarias backend)
         run: npm test
 
@@ -34,11 +34,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - run: npm install
+      - run: npm ci
       - name: Instalar navegador Chromium
         run: npx playwright install --with-deps chromium
       - name: Playwright (E2E)
-        run: npx playwright test
+        run: npx playwright test --workers=1
       - name: Subir reporte de Playwright
         if: always()
         uses: actions/upload-artifact@v4
