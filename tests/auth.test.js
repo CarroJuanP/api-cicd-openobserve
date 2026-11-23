@@ -4,10 +4,12 @@ process.env.DB_PATH = path.join(os.tmpdir(), `jest-auth-${process.pid}.db`); // 
 process.env.ADMIN_PASSWORD = 'Admin123!';
 const request = require('supertest');
 const app = require('../index');
+const db = require('../database');
 
 describe('Autenticación y CRUD de usuarios (Jest + Supertest)', () => {
   let token;
   beforeAll(async () => {
+    await db.ready;
     const res = await request(app).post('/api/auth/login').send({ username: 'admin', password: process.env.ADMIN_PASSWORD || 'Admin123!' });
     token = res.body.token;
   });
