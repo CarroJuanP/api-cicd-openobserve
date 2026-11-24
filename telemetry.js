@@ -13,6 +13,7 @@ if (process.env.OTEL_EXPORTER_OTLP_ENDPOINT && process.env.NODE_ENV !== 'test') 
   process.env.OTEL_LOGS_EXPORTER = process.env.OTEL_LOGS_EXPORTER || 'otlp';
   process.env.OTEL_EXPORTER_OTLP_PROTOCOL = process.env.OTEL_EXPORTER_OTLP_PROTOCOL || 'http/protobuf';
   process.env.OTEL_METRIC_EXPORT_INTERVAL = process.env.OTEL_METRIC_EXPORT_INTERVAL || '15000';
+  process.env.OTEL_METRIC_EXPORT_TIMEOUT = process.env.OTEL_METRIC_EXPORT_TIMEOUT || '10000';
 
   const sdk = new NodeSDK({
     instrumentations: [
