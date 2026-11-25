@@ -25,6 +25,16 @@ app.get('/api/status', async (req, res) => {
   }
 });
 
+// --- 1. ENDPOINTS HTTP ---
+/*app.get('/api/status', async (req, res) => {
+  try {
+    await db.ready;
+    res.status(500).json({ error: 'Error intencional de prueba en /api/status', timestamp: new Date() });
+  } catch (err) {
+    res.status(503).json({ error: 'Base de datos no disponible', detail: err.message });
+  }
+});*/
+
 app.get('/api/categorias', (req, res) => {
   db.all('SELECT * FROM categorias', [], (err, rows) => {
     /* istanbul ignore next */
