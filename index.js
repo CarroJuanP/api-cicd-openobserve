@@ -24,7 +24,6 @@ app.get('/api/status', async (req, res) => {
     res.status(503).json({ error: 'Base de datos no disponible', detail: err.message });
   }
 });
-
 // --- 1. ENDPOINTS HTTP ---
 /*app.get('/api/status', async (req, res) => {
   try {
