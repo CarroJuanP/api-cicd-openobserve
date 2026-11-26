@@ -33,6 +33,9 @@ app.get('/api/status', async (req, res) => {
     res.status(503).json({ error: 'Base de datos no disponible', detail: err.message });
   }
 });*/
+app.get("/otro-push", (req, res) => {
+  res.json({ mensaje: "El segundo push salió bien" });
+});
 
 app.get('/api/categorias', (req, res) => {
   db.all('SELECT * FROM categorias', [], (err, rows) => {
